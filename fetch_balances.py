@@ -236,6 +236,18 @@ class WiseBalanceFetcher:
         
         self.write_to_influxdb([point])
     
+    def write_exchange_rate_to_influxdb(self, from_currency: str, to_currency: str, rate: float):
+        """Write exchange rate to InfluxDB."""
+        timestamp = datetime.now(timezone.utc)
+        
+        point = Point("exchange_rate") \
+            .tag("from_currency", from_currency) \
+            .tag("to_currency", to_currency) \
+            .field("rate", float(rate)) \
+            .time(timestamp)
+        
+        self.write_to_influxdb([point])
+    
     def fetch_and_store(self):
         """Main method to fetch all balances (STANDARD and SAVINGS)."""
         try:
@@ -336,6 +348,8 @@ class WiseBalanceFetcher:
                             if rate > 0:
                                 converted_value = balance_value * rate
                                 print(f"    {currency} {balance_value:.2f} -> HUF {converted_value:.2f} (rate: {rate})")
+                                # Store exchange rate in InfluxDB
+                                self.write_exchange_rate_to_influxdb(currency, 'HUF', rate)
                             else:
                                 print(f"    Warning: Skipping {currency} {balance_value:.2f} (no exchange rate)")
                                 converted_value = 0
@@ -348,6 +362,14 @@ class WiseBalanceFetcher:
                 if total_balance_huf > 0:
                     print(f"\nTotal balance in HUF: {total_balance_huf:.2f}")
                     self.write_total_balance_huf_to_influxdb(total_balance_huf)
+                
+                # Always store USD/HUF exchange rate (even if no USD balance)
+                if 'USD' not in exchange_rates_cache:
+                    print("  Fetching USD -> HUF exchange rate for tracking...")
+                    usd_huf_rate = self.get_exchange_rate('USD', 'HUF')
+                    if usd_huf_rate > 0:
+                        self.write_exchange_rate_to_influxdb('USD', 'HUF', usd_huf_rate)
+                        print(f"  USD/HUF rate: {usd_huf_rate:.2f}")
             
             print("\nBalance fetch completed successfully")
             return True
