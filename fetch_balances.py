@@ -363,13 +363,14 @@ class WiseBalanceFetcher:
                     print(f"\nTotal balance in HUF: {total_balance_huf:.2f}")
                     self.write_total_balance_huf_to_influxdb(total_balance_huf)
                 
-                # Always store USD/HUF exchange rate (even if no USD balance)
-                if 'USD' not in exchange_rates_cache:
-                    print("  Fetching USD -> HUF exchange rate for tracking...")
-                    usd_huf_rate = self.get_exchange_rate('USD', 'HUF')
-                    if usd_huf_rate > 0:
-                        self.write_exchange_rate_to_influxdb('USD', 'HUF', usd_huf_rate)
-                        print(f"  USD/HUF rate: {usd_huf_rate:.2f}")
+                # Always store USD/HUF and EUR/HUF exchange rates (even if no balance in those currencies)
+                for track_currency in ['USD', 'EUR']:
+                    if track_currency not in exchange_rates_cache:
+                        print(f"  Fetching {track_currency} -> HUF exchange rate for tracking...")
+                        rate = self.get_exchange_rate(track_currency, 'HUF')
+                        if rate > 0:
+                            self.write_exchange_rate_to_influxdb(track_currency, 'HUF', rate)
+                            print(f"  {track_currency}/HUF rate: {rate:.2f}")
             
             print("\nBalance fetch completed successfully")
             return True
